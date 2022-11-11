@@ -3,6 +3,8 @@ import numpy as np
 import openml
 import pandas as pd
 from openml.datasets import edit_dataset, fork_dataset, get_dataset
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MaxAbsScaler
 
 #Estabelecendo porcentagem de treino
 #-----------------------------------------------------------------------
@@ -13,34 +15,37 @@ if trainPercentage > 1:
     print("PORCENTAGEM SÓ VAI ATÉ UM, SEU BURRO!!!!!!!!")
     exit
 
-# Adquirindo e processando o dataset
+# Adquirindo e processando o dataset de LoL
+# Aqui, tentamos predizer as vitórias e derrotas baseado nas características de cada time
 #-----------------------------------------------------------------------
-dataset = openml.datasets.get_dataset(50)
+dataset = openml.datasets.get_dataset(43635)
 
 X, y, categorical_indicator, attribute_names = dataset.get_data(
     dataset_format="array", target=dataset.default_target_attribute)
 
+#estabelecendo que as classes são a vitória
+#0=derrota do azul
+#1=vitória do azul
 df = pd.DataFrame(X, columns=attribute_names)
-df['class'] = y
+df['class'] = df['blue_win']
 
-treino = df.sample(frac=trainPercentage, replace=False, axis=0)
+#dropando colunas inúteis
+df = df.drop(["Unnamed:_0", "matchId", "blue_win"], axis=1)
 
-print(treino['class'].value_counts())
-exit()
+#não existem instâncias com valores nulos nesse dataset
+#Logo, não é necessário imputar dados
+
+p= MaxAbsScaler()
+p.fit(df)
+
+X = df.values
+y = df['class'].values
+
+X = np.delete(X, 16, axis=1)
 
 #Distribuição igualitária dos resultados
 #-----------------------------------------------------------------------
-indice = ceil(len(X)*trainPercentage)
-
-unique, counts = np.unique(y, return_counts=True)
-
-indice0 = ceil(counts[1]*trainPercentage) #% de uns
-indice1 = ceil(counts[0]*trainPercentage) #% de zeros
-
-Xtreino = X[:indice0].tolist() + X[counts[1]:indice1].tolist()
-Ytreino = y[:indice0].tolist() + y[counts[1]:indice1].tolist()
-Xteste = X[indice0:counts[1]].tolist() + X[indice1:].tolist()
-Yvalida = y[indice0:counts[1]].tolist() + y[indice1:].tolist()
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1-trainPercentage, random_state=0)
 
 #Knn Classificador
 #-----------------------------------------------------------------------
@@ -51,16 +56,18 @@ if k%2 == 0:
     print("WARNING: Para evitar empates, um valor ímpar é sempre recomendado!")
 
 yteste = []
+iterat = 0
 
 #Para cada valor de teste, existe uma lista de distâncias
-for teste in Xteste:
+for teste in X_test:
     cont = 0
+    print(iterat)
     listaDistancia = []
     #calcula as distâncias euclidianas de todas as amostras de treino
-    for treino in Xtreino:
+    for treino in X_train:
         dist = 0
         for i in range(0, len(treino)):
-            dist = dist + pow(teste[i] - treino[i], 2)
+            dist += pow(teste[i] - treino[i], 2)
         listaDistancia.append((sqrt(dist),cont))
         cont = cont + 1
     #organiza de acordo com a menor distância
@@ -71,9 +78,9 @@ for teste in Xteste:
     #(distancia, indice)
     for menor in range(0, k):
         tupla = listaDistancia[menor]
-        if Ytreino[tupla[1]] == 0:
+        if y_train[tupla[1]] == 0:
             aux1 = aux1 + 1
-        elif Ytreino[tupla[1]] == 1:
+        elif y_train[tupla[1]] == 1:
             aux2 = aux2 + 1
     if aux1 > aux2:
         yteste.append(0)
@@ -81,6 +88,7 @@ for teste in Xteste:
         yteste.append(1)
     else:
         print("Seu K está errado, caramba!")
+    iterat = iterat + 1
 
 #Cálculo das Métricas de acurácia e matriz de confusão
 #-----------------------------------------------------------------------
@@ -93,7 +101,7 @@ controle = 0
 
 # 0 == positivo
 # 1 == negativo
-for result in Yvalida:
+for result in y_test:
     if result == 0:
         if result == yteste[controle]:
             TP = TP + 1
