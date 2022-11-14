@@ -55,7 +55,7 @@ for k in range(3,13,2):
         # ti = Tempo Inicial
         ti = time.time()
 
-        knnClass = KNeighborsClassifier(n_neighbors=k, metric="euclidean")
+        knnClass = KNeighborsClassifier(n_neighbors=k, metric="euclidean", algorithm='ball_tree')
         knnClass.fit(X_train, y_train)
 
         yteste = knnClass.predict(X_test)
