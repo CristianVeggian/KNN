@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 import openml
 import time
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-from sklearn.metrics import confusion_matrix, accuracy_score
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.metrics import mean_absolute_error
 from sklearn.preprocessing import MaxAbsScaler
 from sklearn.model_selection import train_test_split
 from openml.datasets import get_dataset
@@ -12,28 +12,23 @@ from openml.datasets import get_dataset
 #Estabelecendo porcentagem de treino
 #-----------------------------------------------------------------------
 
-trainPercentage = 0.60
+trainPercentage = 0.90
 
 if trainPercentage > 1:
     print("PORCENTAGEM SÓ VAI ATÉ UM, SEU BURRO!!!!!!!!")
     exit
 
-# Adquirindo e processando o dataset de LoL
+# Adquirindo e processando o dataset de Operações de Uma CPU
 # Aqui, tentamos predizer as vitórias e derrotas baseado nas características de cada time
 #-----------------------------------------------------------------------
-dataset = openml.datasets.get_dataset(43635)
+dataset = openml.datasets.get_dataset(562)
 
 X, y, categorical_indicator, attribute_names = dataset.get_data(
     dataset_format="array", target=dataset.default_target_attribute)
 
-#estabelecendo que as classes são a vitória
-#0=derrota do azul
-#1=vitória do azul
+#estabelecendo que as classes são a % de tempo que o CPU roda em modo de usuário
 df = pd.DataFrame(X, columns=attribute_names)
-df['class'] = df['blue_win']
-
-#dropando colunas inúteis
-df = df.drop(["Unnamed:_0", "matchId", "blue_win"], axis=1)
+df['class'] = y
 
 #não existem instâncias com valores nulos nesse dataset
 #Logo, não é necessário imputar dados
@@ -44,27 +39,25 @@ p.fit(df)
 X = df.values
 y = df['class'].values
 
-X = np.delete(X, 16, axis=1)
-
 #Distribuição igualitária dos resultados
 #-----------------------------------------------------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1-trainPercentage, random_state=0)
 
 #Estabelecendo K
 #-----------------------------------------------------------------------
-k = 11
+k = 5
 
 if k%2 == 0:
     print("WARNING: Para evitar empates, um valor ímpar é sempre recomendado!")
 
-#Knn Classificador
+#Knn Regressor (DWNN)
 #-----------------------------------------------------------------------
 
 print("Iniciando processo")
 # ti = Tempo Inicial
 ti = time.time()
 
-knnClass = KNeighborsClassifier(n_neighbors=k, metric="euclidean")
+knnClass = KNeighborsRegressor(n_neighbors=k, metric="euclidean", weights='distance')
 knnClass.fit(X_train, y_train)
 
 yteste = knnClass.predict(X_test)
@@ -73,18 +66,15 @@ yteste = knnClass.predict(X_test)
 tf = time.time()
 print("Fim do processo")
 
-#Cálculo das Métricas de acurácia e matriz de confusão
+#Cálculo da Métrica de erro absoluto médio
 #-----------------------------------------------------------------------
 
-matrizConf = confusion_matrix(y_test, yteste)
-ACC = accuracy_score(y_test, yteste)
+MAE = mean_absolute_error(y_test, yteste)
 
 #Print resultados finais
 #-----------------------------------------------------------------------
 
-print("Tempo de Processamento(s): " + str(tf-ti).replace('.',','))
-print("Matriz de Confusão")
-print(matrizConf)
+print("Tempo de Processamento(s): " + str(tf-ti))
 print("Amostras de treino: " + str(trainPercentage*100) + "%")
 print("Valor de K: " + str(k))
-print(str(ACC).replace('.',',') + "% de acurácia")
+print(str(MAE) + "% de erro absoluto médio")
