@@ -9,17 +9,11 @@ from sklearn.preprocessing import MaxAbsScaler
 from sklearn.model_selection import train_test_split
 from openml.datasets import get_dataset
 
-#Estabelecendo porcentagem de treino
-#-----------------------------------------------------------------------
+arq = open('resultadosDWNNliteratura.txt', 'a')
 
-trainPercentage = 0.90
-
-if trainPercentage > 1:
-    print("PORCENTAGEM SÓ VAI ATÉ UM, SEU BURRO!!!!!!!!")
-    exit
-
-# Adquirindo e processando o dataset de Operações de Uma CPU
-# Aqui, tentamos predizer as vitórias e derrotas baseado nas características de cada time
+# Adquirindo e processando o dataset de Operações de uma CPU
+# Aqui, tentamos predizer o tempo de CPU consumido pelo usuário baseado
+# nas chamadas e na ordem de operações
 #-----------------------------------------------------------------------
 dataset = openml.datasets.get_dataset(562)
 
@@ -36,45 +30,50 @@ df['class'] = y
 p= MaxAbsScaler()
 p.fit(df)
 
-X = df.values
-y = df['class'].values
+X_total = df.values
+y_total = df['class'].values
 
-#Distribuição igualitária dos resultados
-#-----------------------------------------------------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1-trainPercentage, random_state=0)
+for k in range(3,13,2):
+    for pctg in range(50,100,10):
 
-#Estabelecendo K
-#-----------------------------------------------------------------------
-k = 5
+        trainPercentage = pctg/100
 
-if k%2 == 0:
-    print("WARNING: Para evitar empates, um valor ímpar é sempre recomendado!")
+        #Distribuição igualitária dos resultados
+        #-----------------------------------------------------------------------
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1-trainPercentage, random_state=0)
 
-#Knn Regressor (DWNN)
-#-----------------------------------------------------------------------
+        #Knn Regressor (DWNN)
+        #-----------------------------------------------------------------------
 
-print("Iniciando processo")
-# ti = Tempo Inicial
-ti = time.time()
+        print("Iniciando processo")
+        # ti = Tempo Inicial
+        ti = time.time()
 
-knnClass = KNeighborsRegressor(n_neighbors=k, metric="euclidean", weights='distance')
-knnClass.fit(X_train, y_train)
+        knnClass = KNeighborsRegressor(n_neighbors=k, metric="euclidean", weights='distance')
+        knnClass.fit(X_train, y_train)
 
-yteste = knnClass.predict(X_test)
+        yteste = knnClass.predict(X_test)
 
-# tf = Tempo Final
-tf = time.time()
-print("Fim do processo")
+        # tf = Tempo Final
+        tf = time.time()
+        print("Fim do processo")
 
-#Cálculo da Métrica de erro absoluto médio
-#-----------------------------------------------------------------------
+        #Cálculo da Métrica de erro absoluto médio
+        #-----------------------------------------------------------------------
 
-MAE = mean_absolute_error(y_test, yteste)
+        MAE = mean_absolute_error(y_test, yteste)
 
-#Print resultados finais
-#-----------------------------------------------------------------------
+        #Print resultados finais
+        #-----------------------------------------------------------------------
 
-print("Tempo de Processamento(s): " + str(tf-ti))
-print("Amostras de treino: " + str(trainPercentage*100) + "%")
-print("Valor de K: " + str(k))
-print(str(MAE) + "% de erro absoluto médio")
+        arq.write("\n" + str(k))
+        arq.write(" - " + str(trainPercentage*100))
+        arq.write(" - " + str(MAE).replace('.',','))
+        arq.write(" - " + str(tf-ti).replace('.',','))
+
+        print("Tempo de Processamento(s): " + str(tf-ti))
+        print("Amostras de treino: " + str(trainPercentage*100) + "%")
+        print("Valor de K: " + str(k))
+        print(str(MAE) + "% de erro absoluto médio")
+
+arq.close()

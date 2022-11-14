@@ -9,14 +9,7 @@ from sklearn.preprocessing import MaxAbsScaler
 from sklearn.model_selection import train_test_split
 from openml.datasets import get_dataset
 
-#Estabelecendo porcentagem de treino
-#-----------------------------------------------------------------------
-
-trainPercentage = 0.60
-
-if trainPercentage > 1:
-    print("PORCENTAGEM SÓ VAI ATÉ UM, SEU BURRO!!!!!!!!")
-    exit
+arq = open("resultados.txt", "a")
 
 # Adquirindo e processando o dataset de LoL
 # Aqui, tentamos predizer as vitórias e derrotas baseado nas características de cada time
@@ -35,56 +28,60 @@ df['class'] = df['blue_win']
 #dropando colunas inúteis
 df = df.drop(["Unnamed:_0", "matchId", "blue_win"], axis=1)
 
+X_total = df.values
+y_total = df['class'].values
+
+X_total = np.delete(X_total, 16, axis=1)
+
+p = MaxAbsScaler()
+p.fit(df)
+
 #não existem instâncias com valores nulos nesse dataset
 #Logo, não é necessário imputar dados
 
-p= MaxAbsScaler()
-p.fit(df)
-
-X = df.values
-y = df['class'].values
-
-X = np.delete(X, 16, axis=1)
-
-#Distribuição igualitária dos resultados
+#Estabelecendo porcentagens de treino e k's
 #-----------------------------------------------------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1-trainPercentage, random_state=0)
+for k in range(3,13,2):
+    for pctg in range(50,100,10):
+        trainPercentage = pctg/100
 
-#Estabelecendo K
-#-----------------------------------------------------------------------
-k = 11
+        #Distribuição igualitária dos resultados
+        #-----------------------------------------------------------------------
+        X_train, X_test, y_train, y_test = train_test_split(X_total, y_total, test_size=1-trainPercentage, random_state=0)
 
-if k%2 == 0:
-    print("WARNING: Para evitar empates, um valor ímpar é sempre recomendado!")
+        #Knn Classificador
+        #-----------------------------------------------------------------------
 
-#Knn Classificador
-#-----------------------------------------------------------------------
+        # ti = Tempo Inicial
+        ti = time.time()
 
-print("Iniciando processo")
-# ti = Tempo Inicial
-ti = time.time()
+        knnClass = KNeighborsClassifier(n_neighbors=k, metric="euclidean")
+        knnClass.fit(X_train, y_train)
 
-knnClass = KNeighborsClassifier(n_neighbors=k, metric="euclidean")
-knnClass.fit(X_train, y_train)
+        yteste = knnClass.predict(X_test)
 
-yteste = knnClass.predict(X_test)
+        # tf = Tempo Final
+        tf = time.time()
 
-# tf = Tempo Final
-tf = time.time()
-print("Fim do processo")
+        #Cálculo das Métricas de acurácia e matriz de confusão
+        #-----------------------------------------------------------------------
 
-#Cálculo das Métricas de acurácia e matriz de confusão
-#-----------------------------------------------------------------------
+        matrizConf = confusion_matrix(y_test, yteste)
+        ACC = accuracy_score(y_test, yteste)
 
-matrizConf = confusion_matrix(y_test, yteste)
-ACC = accuracy_score(y_test, yteste)
+        #Print resultados finais
+        #-----------------------------------------------------------------------
 
-#Print resultados finais
-#-----------------------------------------------------------------------
+        arq.write("\n" + str(k))
+        arq.write(" - " + str(trainPercentage*100))
+        arq.write(" - " + str(ACC).replace('.',','))
+        arq.write(" - " + str(tf-ti).replace('.',','))
 
-print("Tempo de Processamento(s): " + str(tf-ti).replace('.',','))
-print("Matriz de Confusão")
-print(matrizConf)
-print("Amostras de treino: " + str(trainPercentage*100) + "%")
-print("Valor de K: " + str(k))
-print(str(ACC).replace('.',',') + "% de acurácia")
+        print("Tempo de Processamento(s): " + str(tf-ti).replace('.',','))
+        print("Matriz de Confusão")
+        print(matrizConf)
+        print("Amostras de treino: " + str(trainPercentage*100) + "%")
+        print("Valor de K: " + str(k))
+        print(str(ACC).replace('.',',') + "% de acurácia")
+
+arq.close()

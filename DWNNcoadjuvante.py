@@ -6,21 +6,15 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import mean_absolute_error
 from sklearn.preprocessing import MaxAbsScaler
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import BallTree
 from openml.datasets import get_dataset
 import time
   
+arq = open('resultados.txt', 'a')
 
-#Estabelecendo porcentagem de treino
-#-----------------------------------------------------------------------
-
-trainPercentage = 0.90
-
-if trainPercentage > 1:
-    print("PORCENTAGEM SÓ VAI ATÉ UM, SEU BURRO!!!!!!!!")
-    exit
-
-# Adquirindo e processando o dataset de Operações de Uma CPU
-# Aqui, tentamos predizer as vitórias e derrotas baseado nas características de cada time
+# Adquirindo e processando o dataset de Operações de uma CPU
+# Aqui, tentamos predizer o tempo de CPU consumido pelo usuário baseado
+# nas chamadas e na ordem de operações
 #-----------------------------------------------------------------------
 dataset = openml.datasets.get_dataset(562)
 
@@ -37,71 +31,55 @@ df['class'] = y
 p= MaxAbsScaler()
 p.fit(df)
 
-X = df.values
-y = df['class'].values
+X_total = df.values
+y_total = df['class'].values
+for k in range(3,13,2):
+    for pctg in range(50,100,10):
+        trainPercentage = pctg/100
 
-#Distribuição igualitária dos resultados
-#-----------------------------------------------------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1-trainPercentage, random_state=0)
+        #Distribuição igualitária dos resultados
+        #-----------------------------------------------------------------------
+        X_train, X_test, y_train, y_test = train_test_split(X_total, y_total, test_size=1-trainPercentage, random_state=0)
 
-#Estabelecendo K
-#-----------------------------------------------------------------------
-k = 5
+        yteste = []
 
-if k%2 == 0:
-    print("WARNING: Para evitar empates, um valor ímpar é sempre recomendado!")
+        arvore = BallTree(X_train, leaf_size=10, metric='euclidean')
+        dist, ind = arvore.query(X_test, k=k)  
+        peso = 1/dist**2
 
-#Knn Regressor (DWNN)
-#-----------------------------------------------------------------------
+        # ti = Tempo Inicial
+        ti = time.time()
 
-k = 5
+        #Para cada valor de teste, existe uma lista de distâncias
+        for x in range(0,len(dist)):
+            #(distancia, indice, peso)
+            #Soma todos os pesos
+            somaNum = 0
+            somaDen = 0
+            for i in range(0, k):
+                somaNum += peso[x][i]*y_train[ind[x][i]]
+                somaDen += peso[x][i]
+            yteste.append(somaNum/somaDen)
 
-if k%2 == 0:
-    print("WARNING: Para evitar empates, um valor ímpar é sempre recomendado!")
+        # tf = Tempo Final
+        tf = time.time()
 
-yteste = []
-iterat = 0
+        #Cálculo da Métrica de erro absoluto médio
+        #-----------------------------------------------------------------------
 
-print("Iniciando processo")
-# ti = Tempo Inicial
-ti = time.time()
+        MAE = mean_absolute_error(y_test, yteste)
 
-#Para cada valor de teste, existe uma lista de distâncias
-for teste in X_test:
-    cont = 0
-    listaDistancia = []
-    #calcula as distâncias euclidianas de todas as amostras de treino
-    for treino in X_train:
-        dist = np.linalg.norm(teste-treino)
-        if len(listaDistancia) < k:
-            listaDistancia.append((dist,cont,1/(dist**2)))
-        elif max(listaDistancia, key=lambda tup: tup[0])[0] > dist:
-            listaDistancia.remove(max(listaDistancia, key=lambda tup: tup[0]))
-            listaDistancia.append((dist, cont, 1/(dist**2)))
-        cont += 1
-    #(distancia, indice, peso)
-    #Soma todos os pesos
-    somaNum = 0
-    somaDen = 0
-    for tupla in listaDistancia:
-        somaNum += tupla[2]*y_train[tupla[1]]
-        somaDen += tupla[2]
-    yteste.append(somaNum/somaDen)
-    iterat = iterat + 1
+        #Print resultados finais
+        #-----------------------------------------------------------------------
 
-# tf = Tempo Final
-tf = time.time()
-print("Fim do processo")
+        arq.write("\n" + str(k))
+        arq.write(" - " + str(trainPercentage*100))
+        arq.write(" - " + str(MAE).replace('.',','))
+        arq.write(" - " + str(tf-ti).replace('.',','))
 
-#Cálculo da Métrica de erro absoluto médio
-#-----------------------------------------------------------------------
+        print("Tempo de Processamento(s): " + str(tf-ti))
+        print("Amostras de treino: " + str(trainPercentage*100) + "%")
+        print("Valor de K: " + str(k))
+        print(str(MAE) + "% de erro absoluto médio")
 
-MAE = mean_absolute_error(y_test, yteste)
-
-#Print resultados finais
-#-----------------------------------------------------------------------
-
-print("Tempo de Processamento(s): " + str(tf-ti))
-print("Amostras de treino: " + str(trainPercentage*100) + "%")
-print("Valor de K: " + str(k))
-print(str(MAE) + "% de erro absoluto médio")
+arq.close()
